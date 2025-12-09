@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>即時水質監測儀表板</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        h1 { color: #333; }
+        .dashboard { width: 90%; max-width: 800px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .status-box { padding: 15px; text-align: center; border-radius: 5px; margin-bottom: 20px; font-weight: bold; font-size: 1.2em; color: white; transition: 0.3s; }
+        .normal { background-color: #28a745; box-shadow: 0 0 10px #28a745; }
+        .alert { background-color: #dc3545; box-shadow: 0 0 15px red; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.7; } }
+        canvas { margin-top: 20px; }
+        .value-display { display: flex; justify-content: space-around; margin-bottom: 20px; }
+        .value-card { text-align: center; }
+        .value-card h3 { margin: 0; color: #666; font-size: 0.9em; }
+        .value-card p { margin: 5px 0 0; font-size: 1.5em; font-weight: bold; color: #333; }
+    </style>
+</head>
+<body>
+
+    <h1>💧 即時水質監測中心</h1>
+
+    <div class="dashboard">
+        <div id="statusIndicator" class="status-box normal">連線中...</div>
+        <div class="value-display">
+            <div class="value-card">
+                <h3>COD (化學需氧量)</h3>
+                <p id="codValue">--</p>
+            </div>
+            <div class="value-card">
+                <h3>pH 值</h3>
+                <p id="phValue">--</p>
+            </div>
+        </div>
+        <canvas id="waterChart"></canvas>
+    </div>
+
+    <script>
+        // =================================================
+        // 你的 Ngrok 網址 (我已經幫你依照截圖填好了)
+        const API_URL = "https://elidia-pharmacopoeial-perpendicularly.ngrok-free.dev"; 
+        // =================================================
+
+        const ctx = document.getElementById('waterChart').getContext('2d');
+        const waterChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'COD 濃度 (mg/L)', borderColor: '#007bff', backgroundColor: 'rgba(0, 123, 255, 0.1)', data: [], yAxisID: 'y', fill: true },
+                    { label: 'pH 值', borderColor: '#ffc107', backgroundColor: 'rgba(255, 193, 7, 0.1)', data: [], yAxisID: 'y1', fill: false }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                    y: { type: 'linear', display: true, position: 'left', title: {display: true, text: 'COD'} },
+                    y1: { type: 'linear', display: true, position: 'right', title: {display: true, text: 'pH'}, grid: { drawOnChartArea: false } }
+                }
+            }
+        });
+
+        async function fetchData() {
+            try {
+                // ★★★ 關鍵修改：加入 headers 來通過 Ngrok 驗證 ★★★
+                const response = await fetch(`${API_URL}/api/monitor`, {
+                    headers: new Headers({
+                        "ngrok-skip-browser-warning": "69420",
+                    }),
+                });
+
+                if (!response.ok) throw new Error("API 回傳錯誤");
+
+                const data = await response.json();
+
+                const statusBox = document.getElementById('statusIndicator');
+                document.getElementById('codValue').innerText = data.cod;
+                document.getElementById('phValue').innerText = data.ph;
+
+                if (data.alert) {
+                    statusBox.innerText = "⚠️ 警告：水質汙染超標 (開啟水閘)";
+                    statusBox.className = "status-box alert";
+                } else {
+                    statusBox.innerText = "✅ 系統正常監控中";
+                    statusBox.className = "status-box normal";
+                }
+
+                const timestamp = data.timestamp;
+                if (waterChart.data.labels.slice(-1)[0] !== timestamp) {
+                    waterChart.data.labels.push(timestamp);
+                    waterChart.data.datasets[0].data.push(data.cod);
+                    waterChart.data.datasets[1].data.push(data.ph);
+
+                    if (waterChart.data.labels.length > 20) {
+                        waterChart.data.labels.shift();
+                        waterChart.data.datasets[0].data.shift();
+                        waterChart.data.datasets[1].data.shift();
+                    }
+                    waterChart.update();
+                }
+
+            } catch (error) {
+                console.error("連線錯誤:", error);
+                document.getElementById('statusIndicator').innerText = "❌ 無法連線到伺服器";
+                document.getElementById('statusIndicator').className = "status-box";
+                document.getElementById('statusIndicator').style.backgroundColor = "gray";
+            }
+        }
+
+        setInterval(fetchData, 1000); // 改成每 1 秒更新一次，效果更順暢
+    </script>
+</body>
+</html>

@@ -19,7 +19,7 @@
 <body>
     <div class="card">
         <h2>🤖 AIoT 智慧水質監控中心</h2>
-        <div id="statusBox" class="status normal">系統待命中...</div>
+        <div id="statusBox" class="status normal">連線中...</div>
         
         <div class="data-row">
             <div class="data-box">
@@ -39,8 +39,11 @@
     </div>
 
     <script>
-        // ★★★ 請替換成你的 Ngrok 網址 ★★★
+        // ==========================================
+        // ★★★ 請確認這裡填的是你最新的 Ngrok 網址 ★★★
+        // 依據你的截圖，目前是這個，但如果 Colab 重開過就會變！
         const API_BASE = "https://elidia-pharmacopoeial-perpendicularly.ngrok-free.dev"; 
+        // ==========================================
 
         const ctx = document.getElementById('chart').getContext('2d');
         const chart = new Chart(ctx, {
@@ -48,24 +51,35 @@
             data: {
                 labels: [],
                 datasets: [
-                    { label: 'COD', borderColor: '#007bff', data: [] },
-                    { label: 'pH', borderColor: '#ffc107', data: [] }
+                    { label: 'COD', borderColor: '#007bff', backgroundColor: 'rgba(0,123,255,0.1)', fill: true, data: [] },
+                    { label: 'pH', borderColor: '#ffc107', backgroundColor: 'rgba(255,193,7,0.1)', fill: false, data: [] }
                 ]
+            },
+            options: {
+                animation: false, // 關閉動畫讓更新更順暢
+                interaction: { mode: 'index', intersect: false },
             }
         });
 
         async function updateData() {
             try {
-                // 呼叫新的 Dashboard API
+                // 加入 headers 來繞過 Ngrok 的瀏覽器警告頁面
                 const res = await fetch(`${API_BASE}/api/dashboard/monitor`, {
-                    headers: { "ngrok-skip-browser-warning": "true" }
+                    headers: new Headers({
+                        "ngrok-skip-browser-warning": "69420",
+                    }),
                 });
+
+                if (!res.ok) throw new Error("API 回傳錯誤");
+
                 const data = await res.json();
 
+                // 更新數值
                 document.getElementById('codVal').innerText = data.cod;
                 document.getElementById('phVal').innerText = data.ph;
                 document.getElementById('gateVal').innerText = data.sluice_gate ? "🛑 開啟排洪" : "🔒 關閉";
 
+                // 更新狀態燈號
                 const box = document.getElementById('statusBox');
                 if (data.alert) {
                     box.innerText = "⚠️ 警告：水質異常";
@@ -76,10 +90,13 @@
                 }
 
                 // 更新圖表
-                if (chart.data.labels.slice(-1)[0] !== data.timestamp) {
+                // 如果時間戳記跟上一筆不同，才更新圖表
+                if (chart.data.labels.length === 0 || chart.data.labels.slice(-1)[0] !== data.timestamp) {
                     chart.data.labels.push(data.timestamp);
                     chart.data.datasets[0].data.push(data.cod);
                     chart.data.datasets[1].data.push(data.ph);
+                    
+                    // 只保留最後 20 筆資料
                     if (chart.data.labels.length > 20) {
                         chart.data.labels.shift();
                         chart.data.datasets[0].data.shift();
@@ -87,8 +104,16 @@
                     }
                     chart.update();
                 }
-            } catch (e) { console.error(e); }
+
+            } catch (e) { 
+                console.error("連線錯誤:", e); 
+                document.getElementById('statusBox').innerText = "❌ 無法連線到伺服器";
+                document.getElementById('statusBox').className = "status";
+                document.getElementById('statusBox').style.backgroundColor = "gray";
+            }
         }
+
+        // 每 1 秒更新一次
         setInterval(updateData, 1000);
     </script>
 </body>

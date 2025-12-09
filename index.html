@@ -2,117 +2,94 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>即時水質監測儀表板</title>
+    <title>AIoT 水質監控系統</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        h1 { color: #333; }
-        .dashboard { width: 90%; max-width: 800px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .status-box { padding: 15px; text-align: center; border-radius: 5px; margin-bottom: 20px; font-weight: bold; font-size: 1.2em; color: white; transition: 0.3s; }
-        .normal { background-color: #28a745; box-shadow: 0 0 10px #28a745; }
-        .alert { background-color: #dc3545; box-shadow: 0 0 15px red; animation: blink 1s infinite; }
-        @keyframes blink { 50% { opacity: 0.7; } }
-        canvas { margin-top: 20px; }
-        .value-display { display: flex; justify-content: space-around; margin-bottom: 20px; }
-        .value-card { text-align: center; }
-        .value-card h3 { margin: 0; color: #666; font-size: 0.9em; }
-        .value-card p { margin: 5px 0 0; font-size: 1.5em; font-weight: bold; color: #333; }
+        body { font-family: sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
+        .card { background: white; max-width: 800px; margin: 0 auto; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .status { padding: 15px; color: white; border-radius: 8px; font-size: 1.5em; font-weight: bold; margin-bottom: 20px;}
+        .normal { background: #28a745; }
+        .alert { background: #dc3545; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.6; } }
+        .data-row { display: flex; justify-content: space-around; margin-bottom: 20px; }
+        .data-box h3 { color: #666; font-size: 0.9em; margin: 0; }
+        .data-box p { font-size: 2em; font-weight: bold; margin: 5px 0; color: #333; }
     </style>
 </head>
 <body>
-
-    <h1>💧 即時水質監測中心</h1>
-
-    <div class="dashboard">
-        <div id="statusIndicator" class="status-box normal">連線中...</div>
-        <div class="value-display">
-            <div class="value-card">
-                <h3>COD (化學需氧量)</h3>
-                <p id="codValue">--</p>
+    <div class="card">
+        <h2>🤖 AIoT 智慧水質監控中心</h2>
+        <div id="statusBox" class="status normal">系統待命中...</div>
+        
+        <div class="data-row">
+            <div class="data-box">
+                <h3>COD 濃度</h3>
+                <p id="codVal">--</p>
             </div>
-            <div class="value-card">
+            <div class="data-box">
                 <h3>pH 值</h3>
-                <p id="phValue">--</p>
+                <p id="phVal">--</p>
+            </div>
+            <div class="data-box">
+                <h3>水閘狀態</h3>
+                <p id="gateVal">--</p>
             </div>
         </div>
-        <canvas id="waterChart"></canvas>
+        <canvas id="chart"></canvas>
     </div>
 
     <script>
-        // =================================================
-        // 你的 Ngrok 網址 (我已經幫你依照截圖填好了)
-        const API_URL = "https://elidia-pharmacopoeial-perpendicularly.ngrok-free.dev"; 
-        // =================================================
+        // ★★★ 請替換成你的 Ngrok 網址 ★★★
+        const API_BASE = "https://elidia-pharmacopoeial-perpendicularly.ngrok-free.dev/"; 
 
-        const ctx = document.getElementById('waterChart').getContext('2d');
-        const waterChart = new Chart(ctx, {
+        const ctx = document.getElementById('chart').getContext('2d');
+        const chart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: [],
                 datasets: [
-                    { label: 'COD 濃度 (mg/L)', borderColor: '#007bff', backgroundColor: 'rgba(0, 123, 255, 0.1)', data: [], yAxisID: 'y', fill: true },
-                    { label: 'pH 值', borderColor: '#ffc107', backgroundColor: 'rgba(255, 193, 7, 0.1)', data: [], yAxisID: 'y1', fill: false }
+                    { label: 'COD', borderColor: '#007bff', data: [] },
+                    { label: 'pH', borderColor: '#ffc107', data: [] }
                 ]
-            },
-            options: {
-                responsive: true,
-                interaction: { mode: 'index', intersect: false },
-                scales: {
-                    y: { type: 'linear', display: true, position: 'left', title: {display: true, text: 'COD'} },
-                    y1: { type: 'linear', display: true, position: 'right', title: {display: true, text: 'pH'}, grid: { drawOnChartArea: false } }
-                }
             }
         });
 
-        async function fetchData() {
+        async function updateData() {
             try {
-                // ★★★ 關鍵修改：加入 headers 來通過 Ngrok 驗證 ★★★
-                const response = await fetch(`${API_URL}/api/monitor`, {
-                    headers: new Headers({
-                        "ngrok-skip-browser-warning": "69420",
-                    }),
+                // 呼叫新的 Dashboard API
+                const res = await fetch(`${API_BASE}/api/dashboard/monitor`, {
+                    headers: { "ngrok-skip-browser-warning": "true" }
                 });
+                const data = await res.json();
 
-                if (!response.ok) throw new Error("API 回傳錯誤");
+                document.getElementById('codVal').innerText = data.cod;
+                document.getElementById('phVal').innerText = data.ph;
+                document.getElementById('gateVal').innerText = data.sluice_gate ? "🛑 開啟排洪" : "🔒 關閉";
 
-                const data = await response.json();
-
-                const statusBox = document.getElementById('statusIndicator');
-                document.getElementById('codValue').innerText = data.cod;
-                document.getElementById('phValue').innerText = data.ph;
-
+                const box = document.getElementById('statusBox');
                 if (data.alert) {
-                    statusBox.innerText = "⚠️ 警告：水質汙染超標 (開啟水閘)";
-                    statusBox.className = "status-box alert";
+                    box.innerText = "⚠️ 警告：水質異常";
+                    box.className = "status alert";
                 } else {
-                    statusBox.innerText = "✅ 系統正常監控中";
-                    statusBox.className = "status-box normal";
+                    box.innerText = "✅ 水質正常";
+                    box.className = "status normal";
                 }
 
-                const timestamp = data.timestamp;
-                if (waterChart.data.labels.slice(-1)[0] !== timestamp) {
-                    waterChart.data.labels.push(timestamp);
-                    waterChart.data.datasets[0].data.push(data.cod);
-                    waterChart.data.datasets[1].data.push(data.ph);
-
-                    if (waterChart.data.labels.length > 20) {
-                        waterChart.data.labels.shift();
-                        waterChart.data.datasets[0].data.shift();
-                        waterChart.data.datasets[1].data.shift();
+                // 更新圖表
+                if (chart.data.labels.slice(-1)[0] !== data.timestamp) {
+                    chart.data.labels.push(data.timestamp);
+                    chart.data.datasets[0].data.push(data.cod);
+                    chart.data.datasets[1].data.push(data.ph);
+                    if (chart.data.labels.length > 20) {
+                        chart.data.labels.shift();
+                        chart.data.datasets[0].data.shift();
+                        chart.data.datasets[1].data.shift();
                     }
-                    waterChart.update();
+                    chart.update();
                 }
-
-            } catch (error) {
-                console.error("連線錯誤:", error);
-                document.getElementById('statusIndicator').innerText = "❌ 無法連線到伺服器";
-                document.getElementById('statusIndicator').className = "status-box";
-                document.getElementById('statusIndicator').style.backgroundColor = "gray";
-            }
+            } catch (e) { console.error(e); }
         }
-
-        setInterval(fetchData, 1000); // 改成每 1 秒更新一次，效果更順暢
+        setInterval(updateData, 1000);
     </script>
 </body>
 </html>

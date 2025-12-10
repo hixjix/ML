@@ -116,5 +116,53 @@
         // 每 1 秒更新一次
         setInterval(updateData, 1000);
     </script>
+    <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'base', themeVariables: { primaryColor: '#e3f2fd', edgeLabelBackground: '#ffffff' } });
+</script>
+
+<div style="width: 90%; max-width: 850px; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 8px 16px rgba(0,0,0,0.1); margin: 30px auto;">
+    <h3 style="text-align: center; border-bottom: 2px solid #f0f2f5; padding-bottom: 15px; color: #333;">📊 運作流程圖 (System Architecture)</h3>
+    
+    <div style="display: flex; justify-content: center;">
+        <pre class="mermaid">
+            graph TD
+                %% 定義節點 (Nodes)
+                Sensor["📡 隨機數據生成<br>(模擬感測器)"]
+                API_In["🚪 FastAPI 入口<br>(接收數據)"]
+                DB_Raw[("🗄️ SQLite 資料庫<br>(Raw Table)")]
+                
+                ML["🧠 機器學習模型<br>(判斷汙染)"]
+                DB_Res[("🗄️ SQLite 資料庫<br>(Result Table)")]
+                
+                API_Out["🚪 FastAPI 出口<br>(提供前端)"]
+                Web["💻 網頁儀表板<br>(資料視覺化)"]
+
+                %% 定義流程 (Edges)
+                subgraph "資料蒐集階段"
+                Sensor -->|1. POST 上傳| API_In
+                API_In -->|2. INSERT 存檔| DB_Raw
+                end
+
+                subgraph "AI 分析階段"
+                DB_Raw -.->|3. 讀取最新數據| ML
+                ML -->|4. 邏輯判斷 & 預測| ML
+                ML -->|5. 寫入判斷結果| DB_Res
+                end
+
+                subgraph "前端呈現階段"
+                DB_Res -.->|6. 查詢最新狀態| API_Out
+                API_Out -->|7. JSON 回傳| Web
+                end
+
+                %% 樣式設定 (Styling)
+                style Sensor fill:#fff3e0,stroke:#e65100,stroke-width:2px
+                style ML fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+                style Web fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+                style DB_Raw fill:#f3e5f5,stroke:#4a148c
+                style DB_Res fill:#f3e5f5,stroke:#4a148c
+        </pre>
+    </div>
+</div>
 </body>
 </html>
